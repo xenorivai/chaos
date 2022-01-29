@@ -1,0 +1,4 @@
+﻿  glad.c
+  main.cpp
+F:\dev\chaos\chaos\include\shader.h(37,34): warning C4101: 'e': unreferenced local variable
+  chaos.vcxproj -> F:\dev\chaos\chaos\x64\Debug\chaos.exe

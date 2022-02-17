@@ -1,7 +1,8 @@
-#version 330 core
+#version 430 core
 out vec4 fragColor;
 in vec4 gl_FragCoord;
 
+//uniforms
 uniform vec2 iResolution;
 uniform float iTime;
 uniform float iTimeDelta;
@@ -11,15 +12,27 @@ uniform vec3 camFront;
 uniform vec3 camUp;
 uniform float camFOV;
 
-const int MAX_MARCHING_STEPS = 256;
-const float MIN_DIST = 0.0;
-const float MAX_DIST = 100.0;
-const float EPSILON = 0.0001;
+uniform int MAX_MARCHING_STEPS;
+uniform float MIN_DIST;
+uniform float MAX_DIST;
+uniform int ITERATIONS;
 
+uniform float sphere_fold_min_radius;
+uniform float sphere_fold_fixed_radius;
+
+struct LIGHT {
+	vec3 pos;
+	vec3 intensity;
+};
+uniform int nLights;
+uniform LIGHT lights[2];
+
+const float EPSILON = 0.0001;
 #define M_PI 3.14159265359
 
 mat4 viewMatrix(vec3 eye, vec3 center, vec3 up);
 
+//utility functions
 float smin(float a, float b, float k);
 float boxSDF(vec3 p, vec3 dim);
 float sphereSDF(vec3 p, float r);
@@ -29,38 +42,24 @@ float gyroidTorusSDF(vec3 p);
 float planeSDF(vec3 p);
 float rep(vec3 p, vec3 modulus);
 
-
 float intersectSDF(float A, float B);
 float unionSDF(float A, float B, float k);
 float differenceSDF(float A, float B);
 
-float sceneSDF(vec3 p);
+vec3 rotate(vec3 p, vec3 axis, float theta);
+vec3 boxFold(vec3 p, float value, float Scale);
+vec4 sphereFold(vec4 p);
 
+//ray generation stuff
 vec3 rayDirection(float fieldOfView, vec2 res, vec2 fragCoord);
 float rayMarch(vec3 eye, vec3 marchingDirection, float start, float end);
 vec3 estimateNormal(vec3 p);
 
-vec3 phongContribForLight(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye, vec3 lightPos, vec3 lightIntensity);
-vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye);
+//Phong Illumination
+vec3 phongContribForLight(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 lightPos, vec3 lightIntensity);
+vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, LIGHT lights, int nLights);
 
-vec3 rotate(vec3 p, vec3 axis, float theta) {
-	vec3 v = cross(axis, p), u = cross(v, axis);
-	return u * cos(theta) + v * sin(theta) + axis * dot(p, axis);
-}
-
-vec3 boxFold(vec3 p, float value, float Scale) {
-	return clamp(p, -value, value) * 2.0 - p;
-}
-
-vec4 sphereFold(vec4 p, float MIN_RADIUS, float FIXED_RADIUS) {
-	float LINEAR_SCALE = FIXED_RADIUS / MIN_RADIUS;
-	float pDot = dot(p.xyz, p.xyz);
-	if (pDot < MIN_RADIUS) p *= LINEAR_SCALE;
-	else if (pDot < FIXED_RADIUS) p *= FIXED_RADIUS / pDot;
-
-	return p;
-}
-
+//fractal test bed
 float de(vec3 p) {
 	float Scale = 2.0;
 	vec4 z = vec4(p, 1.0);
@@ -68,15 +67,13 @@ float de(vec3 p) {
 
 	for (int i = 0; i < 25; i++) {
 		z.xyz = boxFold(z.xyz, 1.0, Scale);
-		z = sphereFold(z, 0.5, 1.0);
+		z = sphereFold(z);
 
 		z = Scale * z + c;
 	}
 
 	return length(z.xyz) / z.w;
 }
-
-
 
 float sceneSDF(vec3 p) {
 	//float sphereDist = sphereSDF((p - vec3(5.5)) / 1.2, 0.5) * 1.2;
@@ -90,12 +87,12 @@ float sceneSDF(vec3 p) {
 	//return gyroidTorusSDF(p);
 
 
-	//float sphereDist = sphereSDF(p, .95);
-	//float dist = boxSDF(p, vec3(.75, .75, .75));
-	//dist = differenceSDF(dist, sphereDist);
-	//return min(dist, planeDist);
+	float sphereDist = sphereSDF(p, .95);
+	float dist = boxSDF(p, vec3(.75, .75, .75));
+	dist = differenceSDF(dist, sphereDist);
+	return min(dist, planeDist);
 
-	return de(p);
+	//return de(p);
 
 	//return rep(p, vec3(1, 0, 1));
 	//return unionSDF(rep(p, vec3(0.25, 0, 0.25)), planeDist, 0.1);
@@ -108,41 +105,7 @@ float sceneSDF(vec3 p) {
 
 }
 
-//vec3 ambientLighting(vec3 lightColor, float ambientStrength = 0.1) {
-//	vec3 ambient = ambientStrength * lightColor;
-//	return ambient;
-//}
-
-//vec3 diffuseLighting(vec3 lightColor, vec3 normal, vec3 lightPos, vec3 p) {
-//	vec3 ambient = ambientLighting(lightColor);
-//
-//	vec3 lightDir = (lightPos - p);
-//	float diffuseFactor = max(dot(normal, lightDir), 0.0);
-//	vec3 diffuse = diffuseFactor * lightColor;
-//
-//	return diffuse;
-//}
-
-//vec3 specularLighting(vec3 lightColor, vec3 normal, vec3 lightPos, vec3 p) {
-//	float specularStrength = 0.5;
-//	vec3 lightDir = (lightPos - p);
-//	vec3 viewDir = normalize(camPos - p);
-//	vec3 reflectDir = reflect(-lightDir, normal);
-//	float spec = pow(max(dot(viewDir, reflectDir), 0.0), 2);
-//	vec3 specular = specularStrength * spec * lightColor;
-//
-//	return specular;
-//}
-
-//vec3 Lighting(vec3 lightColor, vec3 objectColor, vec3 normal, vec3 lightPos, vec3 p) {
-//	vec3 a = ambientLighting(lightColor);
-//	vec3 d = diffuseLighting(lightColor, normal, lightPos, p);
-//	vec3 s = specularLighting(lightColor, normal, lightPos, p);
-//
-//	return (a + d + s) * objectColor;
-//}
-
-//returns true if shadow ray from ro towards light hits anything
+//returns true if shadow ray from 'ro' towards(along 'rd') light hits anything
 bool shadow(vec3 ro, vec3 rd, float mint, float maxt) {
 	for (float t = mint; t < maxt; )
 	{
@@ -175,30 +138,80 @@ void main()
 		return;
 	}
 
+	//go to the closest point
+	vec3 p = camPos + dist * worldDir;
+
 	//color the point
-	vec3 p = camPos + dist * worldDir; //"the" point
-
-	vec3 K_a = vec3(0.2, 0.2, 0.2);
-	vec3 K_d = vec3(1.5f, 0.5f, 0.31f);
+	vec3 K_a = vec3(0.2);
+	vec3 K_d = vec3(0.1, 0.81, 1);
 	vec3 K_s = vec3(1.0, 1.0, 1.0);
-	float shininess = 5.0;
+	float shininess = 32.0;
 
-	vec3 color = vec3(0);
-	//vec3 lightColor = vec3(1.0, 1.0, 1.0) / 5;
-	//vec3 objectColor = vec3(1.5f, 0.5f, 0.31f);
-	//vec3 normal = estimateNormal(p);
-	vec3 lightPos = vec3(4.0 * sin(iTime), 2.0, 4.0 * cos(iTime));
+	//LIGHT lights[2];
+	//lights[0].pos = vec3(4.0 * sin(iTime), 2.0, 4.0 * cos(iTime));
+	//lights[0].intensity = vec3(0.8);
+	//
+	////lights[1].pos = vec3(2.0 * sin(0.37 * iTime), 2.0 * cos(0.37 * iTime), 2.0);
+	//lights[1].pos = vec3(0.1 * sin(0.5 * iTime), 0.2 * (sin(0.5 * iTime) + 1) + 0.95, 0.1 * cos(0.5 * iTime));
+	//lights[1].intensity = vec3(1.2, 0.2, 0.2);
 
-	color = phongIllumination(K_a, K_d, K_s, shininess, p, camPos);
+	const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0);
+	vec3 color = ambientLight * K_a;
 
 	//check for shadows? -- raymarch from point to lightPos
-	//if (shadow(p, normalize(lightPos - p), 0.01, 3.0)) {
-	//	color = vec3(0, 0, 0.15);
-	//}
+	for (int i = 0; i < nLights; i++) {
+		if (shadow(p, normalize(lights[i].pos - p), 0.01, 3.0)) {
+			color *= 0.1;
+		}
+	}
+	for (int i = 0; i < nLights; i++) {
+		color += phongContribForLight(K_d, K_s, shininess, p, lights[i].pos, lights[i].intensity);
+	}
 
-	//color = Lighting(lightColor, objectColor, normal, lightPos, p);
+
+
 
 	fragColor = vec4(color, 1.0);
+}
+
+/* TO-FIX!! Attempt to pass array of struct of lights DOES NOT WORK
+
+	vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, LIGHT[] lights, int nLights) {
+
+		const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0);
+		vec3 color = ambientLight * k_a;
+
+		for (int i = 0; i < nLights; i++) {
+			color += phongContribForLight(k_d, k_s, alpha, p, lights[i].pos, lights[i].intensity);
+			if (shadow(p, normalize(lights[i].pos - p), 0.01, 3.0)) {
+				color = vec3(0.15, 0.15, 0.15);
+			}
+		}
+		return color;
+	}
+*/
+
+vec3 phongContribForLight(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 lightPos, vec3 lightIntensity) {
+	//https://en.wikipedia.org/wiki/Phong_reflection_model
+	vec3 N = estimateNormal(p);
+	vec3 L = normalize(lightPos - p);
+	vec3 V = normalize(camPos - p);
+	vec3 R = normalize(reflect(-L, N));
+
+	float dotLN = dot(L, N);
+	float dotRV = dot(R, V);
+
+	if (dotLN < 0.0) {
+		// Light not visible from this point on the surface
+		return vec3(0.0, 0.0, 0.0);
+	}
+
+	if (dotRV < 0.0) {
+		// Light reflection in opposite direction as viewer, apply only diffuse
+		// component
+		return lightIntensity * (k_d * dotLN);
+	}
+	return lightIntensity * (k_d * dotLN + k_s * pow(dotRV, alpha));
 }
 
 float smin(float a, float b, float k) {
@@ -310,47 +323,20 @@ vec3 estimateNormal(vec3 p) {
 	));
 }
 
-vec3 phongContribForLight(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
-	vec3 lightPos, vec3 lightIntensity) {
-	vec3 N = estimateNormal(p);
-	vec3 L = normalize(lightPos - p);
-	vec3 V = normalize(eye - p);
-	vec3 R = normalize(reflect(-L, N));
-
-	float dotLN = dot(L, N);
-	float dotRV = dot(R, V);
-
-	if (dotLN < 0.0) {
-		// Light not visible from this point on the surface
-		return vec3(0.0, 0.0, 0.0);
-	}
-
-	if (dotRV < 0.0) {
-		// Light reflection in opposite direction as viewer, apply only diffuse
-		// component
-		return lightIntensity * (k_d * dotLN);
-	}
-	return lightIntensity * (k_d * dotLN + k_s * pow(dotRV, alpha));
+vec3 rotate(vec3 p, vec3 axis, float theta) {
+	vec3 v = cross(axis, p), u = cross(v, axis);
+	return u * cos(theta) + v * sin(theta) + axis * dot(p, axis);
 }
 
-vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye) {
-	const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0);
-	vec3 color = ambientLight * k_a;
+vec3 boxFold(vec3 p, float value, float Scale) {
+	return clamp(p, -value, value) * Scale - p;
+}
 
-	vec3 light1Pos = vec3(4.0 * sin(iTime), 2.0, 4.0 * cos(iTime));
-	//vec3 light1Pos = vec3(2);
-	vec3 light1Intensity = vec3(0.4, 0.4, 0.4);
+vec4 sphereFold(vec4 p) {
+	float LINEAR_SCALE = sphere_fold_fixed_radius / sphere_fold_min_radius;
+	float pDot = dot(p.xyz, p.xyz);
+	if (pDot < sphere_fold_min_radius) p *= LINEAR_SCALE;
+	else if (pDot < sphere_fold_fixed_radius) p *= sphere_fold_fixed_radius / pDot;
 
-	color += phongContribForLight(k_d, k_s, alpha, p, eye, light1Pos, light1Intensity);
-
-	//vec3 light2Pos = vec3(2.0 * sin(0.37 * iTime), 2.0 * cos(0.37 * iTime), 2.0);
-	//light2Pos = vec3(2);
-	//vec3 light2Intensity = vec3(0.4, 0.4, 0.4);
-
-	//color += phongContribForLight(k_d, k_s, alpha, p, eye, light2Pos, light2Intensity);
-
-	//vec3 lightPos3 = camPos;
-	//vec3 lightIntense3 = vec3(0.1, 0.1, 0.1);
-	//color += phongContribForLight(k_d, k_s, alpha * alpha, p, eye, lightPos3, lightIntense3);
-	return color;
+	return p;
 }

@@ -30,68 +30,26 @@ Camera camera(glm::vec3(0.0f, 2.0f, 5.0f));
 struct fractal_uniforms {
 	// Renderer
 	int maxMarchingSteps = 1000;
-	float baseMinDistance = 0.00001;
+	float baseMinDistance = 0.00001f;
 	float minDistance = baseMinDistance;
-	float maxDistance = 1000.0;
+	float maxDistance = 1000.0f;
 	int minDistanceFactor = 0;
 	int fractalIters = 100;
-	float bailLimit = 5.0;
+	float bailLimit = 5.0f;
 
 	// Mandelbulb
-	float power = 8.0;
+	float power = 8.0f;
 	int derivativeBias = 1;
-	bool julia = false;
-	glm::vec3 juliaC = glm::vec3(0.86, 0.23, -0.5);
 
 	// Box
 	int boxFoldFactor = 1;
-	float boxFoldingLimit = 1.0;
+	float boxFoldingLimit = 1.0f;
 
 	// Sphere
 	int sphereFoldFactor = 1;
-	float sphereMinRadius = 0.01;
-	float sphereFixedRadius = 2.0;
+	float sphereMinRadius = 0.01f;
+	float sphereFixedRadius = 2.0f;
 	bool sphereMinTimeVariance = false;
-
-	// Mandelbox
-	int mandelBoxFactor = 1;
-	float mandelBoxScale = 1.2;
-
-	// Tetra
-	int tetraFactor = 1;
-	float tetraScale = 1.0;
-
-	float fudgeFactor = 1.0;
-	float noiseFactor = 0.5;
-	glm::vec3 bgColor = glm::vec3(0.8, 0.85, 1.0);
-	glm::vec3 glowColor = glm::vec3(0.75, 0.9, 1.0);
-	float glowFactor = 1.0;
-	bool showBgGradient = true;
-
-	glm::vec4 orbitStrength = glm::vec4(-1.0, -1.8, -1.4, 1.3);
-	glm::vec3 otColor0 = glm::vec3(0.3, 0.5, 0.2);
-	glm::vec3 otColor1 = glm::vec3(0.6, 0.2, 0.5);
-	glm::vec3 otColor2 = glm::vec3(0.25, 0.7, 0.9);
-	glm::vec3 otColor3 = glm::vec3(0.2, 0.45, 0.25);
-	glm::vec3 otColorBase = glm::vec3(0.3, 0.6, 0.3);
-	float otBaseStrength = 0.5;
-	float otDist0to1 = 0.3;
-	float otDist1to2 = 1.0;
-	float otDist2to3 = 0.4;
-	float otDist3to0 = 0.2;
-	float otCycleIntensity = 5.0;
-	float otPaletteOffset = 0.0;
-
-	int shadowRayMinStepsTaken = 5;
-	glm::vec3 lightPos = glm::vec3(3.0, 3.0, 10.0);
-	float shadowBrightness = 0.2f;
-	bool lightSource = true;
-	float phongShadingMixFactor = 1.0;
-	float ambientIntensity = 1.0;
-	float diffuseIntensity = 1.0;
-	float specularIntensity = 1.0;
-	float shininess = 32.0;
-	bool gammaCorrection = false;
 };
 
 fractal_uniforms u;
